@@ -35,35 +35,19 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     dy = y1 - y0;
     derror = abs(dy * 2);
     error_sum = 0;
-    if (steep)
+    for (x = x0, y = y0; x <= x1; x++)
     {
-        for (x = x0, y = y0; x <= x1; x++)
-        {
+        if (steep)
             image.set(y, x, color);
-
-            error_sum += derror;
-            if (error_sum > dx)
-            {
-                y += y1 > y0 ? 1 : -1;
-                error_sum -= dx * 2;
-            }
-        }
-    } 
-    else
-    {
-        for (x = x0, y = y0; x <= x1; x++)
-        {
+        else   
             image.set(x, y, color);
-
-            error_sum += derror;
-            if (error_sum > dx)
-            {
-                y += y1 > y0 ? 1 : -1;
-                error_sum -= dx * 2;
-            }
+        error_sum += derror;
+        if (error_sum > dx)
+        {
+            y += y1 > y0 ? 1 : -1;
+            error_sum -= dx * 2;
         }
-    }    
-    
+    }
 }
 
 int main(int argc, char const *argv[])
