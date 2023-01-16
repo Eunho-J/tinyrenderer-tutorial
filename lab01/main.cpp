@@ -20,16 +20,16 @@ inline int abs(int a)
 void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) { 
     bool steep = false;
     int dx, dy, derror, error_sum, x, y;
-    if (x0 > x1) 
-    {
-        swap(&x0, &x1);
-        swap(&y0, &y1);
-    }
     if (abs(x1 - x0) < abs(y1 - y0))
-    {
+    { //기울기 절댓값이 1 이상일 경우 뒤집었다가 칠할때 다시 뒤집어준다.
         swap(&x0, &y0);
         swap(&x1, &y1);
         steep = true;
+    }
+    if (x0 > x1) 
+    { //x0 부터 x1까지 증가시키면서 칠하기 때문에 x1이 x0보다 더 크거나 같아야한다.
+        swap(&x0, &x1);
+        swap(&y0, &y1);
     }
     dx = x1 - x0;
     dy = y1 - y0;
@@ -57,7 +57,7 @@ int main(int argc, char const *argv[])
     line(5,5,89,52,image,white);
     line(90,3,5,5,image,red);
     line(10,10,10,90,image,blue);
-    line(50,5,50,95,image,green);
+    line(50,5,6,95,image,green);
 
     image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
     image.write_tga_file("output.tga");
