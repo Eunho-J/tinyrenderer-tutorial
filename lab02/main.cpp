@@ -1,95 +1,49 @@
-#include <vector>
-#include <cmath>
-#include "tgaimage.h"
-#include "model.h"
+#include <vector> 
+#include <iostream> 
 #include "geometry.h"
+#include "tgaimage.h" 
+ 
+const int width  = 200; 
+const int height = 200; 
+ 
+Vec3f barycentric(Vec2i *pts, Vec2i P) { 
+    Vec3f u = Vec3f(pts[2].x-pts[0].x, pts[1].x-pts[0].x, pts[0].x-P.x)^Vec3f(pts[2].y-pts[0].y, pts[1].y-pts[0].y, pts[0].y-P.y);
+    /* 마지막 인자가 0이면 해가 없다. 그런데 여기서는 어짜피 정수 좌표만을 사용하므로, 
+       절대값이 1보다 작은 것이 0임을 의미한다. */
+    if (std::abs(u.z)<1) return Vec3f(-1,1,1);
+    return Vec3f(1.f-(u.x+u.y)/u.z, u.y/u.z, u.x/u.z); 
+} 
+ 
+void triangle(Vec2i *pts, TGAImage &image, TGAColor color) { 
+    Vec2i bboxmin(image.get_width()-1,  image.get_height()-1); 
+    Vec2i bboxmax(0, 0); 
+    Vec2i clamp(image.get_width()-1, image.get_height()-1); 
+    /* 이미지 전체의 점에 대해서 각 삼각형에 대해 검사를 하면 너무 많은 연산을 해야한다. 
+       따라서 삼각형을 둘러싼 최소 크기의 Bounding Box를 구하여,
+       해당 Box 안의 점에 대해서만 연산을 수행한다. */
+    for (int i=0; i<3; i++) { 
+        bboxmin.x = std::max(0, std::min(bboxmin.x, pts[i].x));
+	bboxmin.y = std::max(0, std::min(bboxmin.y, pts[i].y));
 
-const TGAColor white = TGAColor(255, 255, 255, 255);
-const TGAColor red   = TGAColor(255, 0,   0,   255);
-const TGAColor green = TGAColor(0,   255, 0,   255);
-Model *model = NULL;
-const int width  = 800;
-const int height = 800;
-
-void line(Vec2i p0, Vec2i p1, TGAImage &image, TGAColor color) {
-    bool steep = false; 
-    if (std::abs(p0.x-p1.x)<std::abs(p0.y-p1.y)) { 
-        std::swap(p0.x, p0.y); 
-        std::swap(p1.x, p1.y); 
-        steep = true; 
+	bboxmax.x = std::min(clamp.x, std::max(bboxmax.x, pts[i].x));
+	bboxmax.y = std::min(clamp.y, std::max(bboxmax.y, pts[i].y));
     } 
-    if (p0.x>p1.x) { 
-        std::swap(p0.x, p1.x); 
-        std::swap(p0.y, p1.y); 
-    } 
-    int dx = p1.x-p0.x; 
-    int dy = p1.y-p0.y; 
-    int derror2 = std::abs(dy)*2; 
-    int error2 = 0; 
-    int y = p0.y; 
-    for (int x=p0.x; x<=p1.x; x++) { 
-        if (steep) { 
-            image.set(y, x, color); 
-        } else { 
-            image.set(x, y, color); 
+    Vec2i P; 
+    for (P.x=bboxmin.x; P.x<=bboxmax.x; P.x++) { 
+        for (P.y=bboxmin.y; P.y<=bboxmax.y; P.y++) { 
+            Vec3f bc_screen  = barycentric(pts, P); 
+            //i, j, k중 하나라도 음수이면 삼각형 밖의 점이다.
+            if (bc_screen.x<0 || bc_screen.y<0 || bc_screen.z<0) continue;
+            image.set(P.x, P.y, color); 
         } 
-        error2 += derror2; 
-        if (error2 > dx) { 
-            y += (p1.y>p0.y?1:-1); 
-            error2 -= dx*2; 
-        } 
     } 
+} 
+ 
+int main(int argc, char** argv) { 
+    TGAImage frame(width, height, TGAImage::RGB); 
+    Vec2i pts[3] = {Vec2i(10,10), Vec2i(100, 30), Vec2i(190, 160)}; 
+    triangle(pts, frame, TGAColor(255, 0, 0, 255)); 
+    frame.flip_vertically(); // to place the origin in the bottom left corner of the image 
+    frame.write_tga_file("framebuffer.tga");
+    return 0; 
 }
-
-void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color) {
-    if (t0.y==t1.y && t0.y==t2.y) return; // i dont care about degenerate triangles
-    if (t0.y>t1.y) std::swap(t0, t1);
-    if (t0.y>t2.y) std::swap(t0, t2);
-    if (t1.y>t2.y) std::swap(t1, t2);
-    int total_height = t2.y-t0.y;
-    for (int i=0; i<total_height; i++) {
-        bool second_half = i>t1.y-t0.y || t1.y==t0.y;
-        int segment_height = second_half ? t2.y-t1.y : t1.y-t0.y;
-        float alpha = (float)i/total_height;
-        float beta  = (float)(i-(second_half ? t1.y-t0.y : 0))/segment_height; // be careful: with above conditions no division by zero here
-        Vec2i A =               t0 + (t2-t0)*alpha;
-        Vec2i B = second_half ? t1 + (t2-t1)*beta : t0 + (t1-t0)*beta;
-        if (A.x>B.x) std::swap(A, B);
-        for (int j=A.x; j<=B.x; j++) {
-            image.set(j, t0.y+i, color); // attention, due to int casts t0.y+i != A.y
-        }
-    }
-}
-
-int main(int argc, char** argv) {
-    if (2==argc) {
-        model = new Model(argv[1]);
-    } else {
-        model = new Model("obj/african_head.obj");
-    }
-
-    TGAImage image(width, height, TGAImage::RGB);
-    Vec3f light_dir(0,0,-1);
-    for (int i=0; i<model->nfaces(); i++) {
-        std::vector<int> face = model->face(i);
-        Vec2i screen_coords[3];
-        Vec3f world_coords[3];
-        for (int j=0; j<3; j++) {
-            Vec3f v = model->vert(face[j]);
-            screen_coords[j] = Vec2i((v.x+1.)*width/2., (v.y+1.)*height/2.);
-            world_coords[j]  = v;
-        }
-        Vec3f n = (world_coords[2]-world_coords[0])^(world_coords[1]-world_coords[0]);
-        n.normalize();
-        float intensity = n*light_dir;
-        if (intensity>0) {
-            triangle(screen_coords[0], screen_coords[1], screen_coords[2], image, TGAColor(intensity*255, intensity*255, intensity*255, 255));
-        }
-    }
-
-    image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
-    image.write_tga_file("output.tga");
-    delete model;
-    return 0;
-}
-
