@@ -1,5 +1,5 @@
 SYSCONF_LINK = g++
-CPPFLAGS     =
+CPPFLAGS     = -I/opt/homebrew/Cellar/eigen/3.4.0_1/include/eigen3
 LDFLAGS      =
 LIBS         = -lm
 
